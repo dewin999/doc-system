@@ -19,4 +19,16 @@ function connect() {
   });
 }
 
-export const sql: postgres.Sql = g.__sql ?? (g.__sql = connect());
+function getSql(): postgres.Sql {
+  return g.__sql ?? (g.__sql = connect());
+}
+
+// เชื่อมต่อเมื่อถูกใช้งานครั้งแรกเท่านั้น (ตอน build ไม่ต้องมี DATABASE_URL)
+export const sql = new Proxy(function () {} as unknown as postgres.Sql, {
+  apply: (_t, _this, args) => (getSql() as unknown as (...a: unknown[]) => unknown)(...args),
+  get: (_t, prop) => {
+    const real = getSql() as unknown as Record<PropertyKey, unknown>;
+    const v = real[prop];
+    return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(real) : v;
+  }
+});
